@@ -1,0 +1,90 @@
+---
+title: "p231hw2"
+author: "Eleanor Li"
+date: "2022-10-13"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(ggplot2)
+library(readr)
+library(workflows)
+library(dplyr)
+```
+
+# Q1 
+```{r}
+abalone<-read.csv("C:/Users/linwe/Downloads/homework-2/data/abalone.csv")
+age<-c(abalone$ring+1.5)
+#print(age)
+abalone$age<-age
+#print(abalone)
+
+ggplot(data=abalone,aes(x=age))+geom_histogram(color='white')
+```
+# The distribution of age is right-skewed normal distrinution. 
+
+# Q2
+```{r}
+set.seed(4000)
+abalone_split<-initial_split(abalone,prop=0.70,strata=age)
+abalone_train<-training(abalone_split)
+abalone_test<-testing(abalone_split)
+
+#print(abalone_train)
+#print(abalone_test)
+```
+# Q3
+```{r}
+train_data <-subset(abalone_train,select=-rings)
+age_recipe <- recipe(age ~ . , data = train_data) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(terms = ~ starts_with('type'):shucked_weight
+                +longest_shell:diameter
+                +shucked_weight:shell_weight)%>%
+  step_center(all_predictors())%>%
+  step_scale(all_predictors())
+summary(age_recipe)
+```
+
+# Q4
+```{r}
+myreg <- linear_reg()%>%
+  set_engine('lm')
+print(myreg)
+```
+
+# Q5
+```{r}
+wkflow <- workflow() %>%
+  add_model(myreg) %>%
+  add_recipe(age_recipe)
+print(wkflow)
+```
+
+# Q6
+```{r}
+predict_hypo <- data.frame(type = 'F',longest_shell = 0.5,diameter = 0.1,
+                           height = 0.3, whole_weight = 4, shucked_weight = 1, 
+                           viscera_weight = 2, shell_weight = 1)
+print(predict_hypo)
+
+myfit<-fit(wkflow,abalone_train)
+predict(myfit,predict_hypo)
+```
+
+# Q7
+```{r}
+library(yardstick)
+library(glmnet)
+mymetric <- metric_set(rsq,rmse,mae)
+abalone_train_predict1 <- predict(myfit, abalone_train%>%select(-age))
+abalone_train_predict2 <- bind_cols(abalone_train_predict1, abalone_train %>% select(age))
+mymetric(abalone_train_predict2,age,estimate = .pred)
+
+```
+
